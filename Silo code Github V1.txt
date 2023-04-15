@@ -1,0 +1,116 @@
+import csv
+from datetime import datetime, timedelta
+
+# Define the current date
+current_date = datetime.now().date()
+
+# Define the dictionary to store the count for each class
+class_count = {'cattle': 0, 'sheep': 0, 'goats': 0}
+# date feed was delivered
+Delivery = input("Enter the date feed was delivered (Year/Month/Day):")
+
+# delivery date into datetime object
+Delivery_date_string = Delivery
+Delivery_date_format = "%Y/%m/%d"
+Delivery_date = datetime.strptime(Delivery_date_string, Delivery_date_format).date()
+
+# delivery amount
+Amount = input("Enter the Amount of feed delivered in KILOGRAMS:")
+
+# Feed left in silo or bins to be added to delivery amount
+Residual_feed = input(
+    "Enter the amount of feed remaining in the silo when the feed was delivered (in KILOGRAMS)\nList this as zero if the silo was empty:")
+Res_fd = int(Residual_feed)
+Amt = int(Amount)
+Silo_total = Res_fd + Amt
+
+# summary of feed on hand at beginning
+print("****************************************************************\n")
+print("SUMMARY")
+print("On the " + Delivery + " " + Amount + " kilograms of feed was delivered to the silo.")
+print("Total feed levels (in KILOGRAMS) after deliver were found to be:")
+print(Silo_total)
+print("\n****************************************************************")
+
+# Open the CSV file in "append" mode
+with open('animal_data.csv', mode='a', newline='') as csv_file:
+    # Create a writer object
+    writer = csv.writer(csv_file)
+
+    while True:
+    # Prompt the user for the key and values for the dictionary
+         ID = input("Enter the animal ID (or 'done' to finish): ")
+         if ID == 'done':
+        # If the user enters 'done', exit the loop
+            break
+
+        # variable for species
+         animal_class = input("Enter the species of animal " + ID + "\n1. for cattle\n2. For sheep\n3. For goats\n")
+
+         arrival_date = input(
+             "Enter the date arrive on the property during the feed period.\n NOTE: If the animal was present from the beginning of this periods, use the date " + Delivery + "\nEnter a date in the format YYYY-MM-DD: ")
+
+    # Did the animal leave the property during the feeding period and stops being counted - departure date - NA if did not leave
+         departure_date = input("If the animal left the property during the feeding period, please enter the date or NA")
+         if departure_date == "NA":
+             departure = None
+
+        # Write the input as a new row in the CSV file, with each value in a separate column
+         writer.writerow([ID, animal_class, arrival_date, departure_date])
+
+animal_counts = {}
+
+
+# Open the CSV file
+with open('animal_data.csv', newline='') as csvfile:
+    reader = csv.reader(csvfile, delimiter=',', quotechar='"')
+
+    silo_total_copy = Silo_total  # create a copy of the original Silo_total value
+
+    # Loop through each line in the CSV file until Silo_total is zero
+    while silo_total_copy > 0:
+        try:
+            row = next(reader)
+        except StopIteration:
+            print(f"The final date is: {current_date}")
+            break
+        for row in reader:
+            animal_id = row[0]
+            arrival_date = datetime.strptime(row[2], '%Y-%m-%d').date()
+            departure_date_str = row[3]
+            if departure_date_str == 'NA':
+                departure_date = None
+            else:
+                departure_date = datetime.strptime(departure_date_str, '%Y-%m-%d').date()
+            animal_class = row[3]
+
+            if departure_date is None:
+                # The animal is still on the property, so increment the count for its class
+                if current_date >= arrival_date:
+                    class_count[animal_class] += 1
+                    cattle = class_count['cattle']
+                    sheep = class_count['sheep']
+                    goats = class_count['goats']
+                    feed_usage = (sheep * 0.5) + (cattle * 1) + (goats * 0.5)
+                    silo_total_copy = max(0, silo_total_copy - feed_usage)
+            else:
+                # The animal has left the property, so check if it was present during the feeding period
+                if current_date >= arrival_date and current_date <= departure_date:
+                    class_count[animal_class] += 1
+                    cattle = class_count['cattle']
+                    sheep = class_count['sheep']
+                    goats = class_count['goats']
+                    feed_usage = (sheep * 0.5) + (cattle * 1) + (goats * 0.5)
+                    silo_total_copy = max(0, silo_total_copy - feed_usage)
+
+            # Move the current date forward by one day
+            current_date += timedelta(days=1)
+
+    # Print the count for each class
+    for animal_class, count in class_count.items():
+        print(f'Count for {animal_class}: {count}')
+
+        # Reset the CSV file reader to the beginning of the file
+    csvfile.seek(0)
+
+    next(reader)  # Skip the header row
